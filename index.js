@@ -13,8 +13,6 @@ const rl = readline.createInterface({
 
 async function transferNEX(to, amount = "0.1") {
     try {
-
-            
         console.log("\n==============================");
         console.log("      🚀 NEX Transfer 🚀      ");
         console.log("==============================\n");
@@ -28,17 +26,29 @@ async function transferNEX(to, amount = "0.1") {
         const value = ethers.parseUnits(amount, 18);
         console.log(`🔹 Preparing to send: ${amount} NEX to ${to}`);
 
-        // Fetch fee data
+        // Dynamically estimate gas limit
+        const estimatedGasLimit = await provider.estimateGas({
+            to: to,
+            value: value
+        });
+        console.log(`🔹 Estimated Gas Limit: ${estimatedGasLimit.toString()}`);
+
+        // Fetch up-to-date fee data
         const feeData = await provider.getFeeData();
-        const maxFeePerGas = feeData.maxFeePerGas || feeData.gasPrice;
-        const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || ethers.parseUnits("2", "gwei");
-        console.log("🔹 Gas fee data retrieved.");
+        let maxFeePerGas = feeData.maxFeePerGas || feeData.gasPrice || ethers.parseUnits("2", "gwei");
+        let maxPriorityFeePerGas = feeData.maxPriorityFeePerGas || ethers.parseUnits("1", "gwei");
+
+        // Ensure maxPriorityFeePerGas does not exceed maxFeePerGas
+        if (maxPriorityFeePerGas > maxFeePerGas) {
+            maxPriorityFeePerGas = maxFeePerGas.sub(ethers.parseUnits("0.1", "gwei"));
+        }
+        console.log(`🔹 Gas Fees: maxFeePerGas=${maxFeePerGas.toString()}, maxPriorityFeePerGas=${maxPriorityFeePerGas.toString()}`);
 
         // Create native transfer transaction
         const tx = {
             to: to, // Recipient address
             value: value, // Amount of NEX to send
-            gasLimit: 21000, // Standard gas limit for native transfers
+            gasLimit: estimatedGasLimit, // Dynamic gas limit
             maxFeePerGas: maxFeePerGas,
             maxPriorityFeePerGas: maxPriorityFeePerGas,
             chainId: parseInt(process.env.CHAIN_ID),
